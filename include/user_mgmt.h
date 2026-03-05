@@ -3,24 +3,15 @@
 
 #include <telebot.h>
 
-typedef struct User_struct{
+typedef struct{
     long long int id;
-    char name[8];
+    char name[30];
     bool verified;
-}User_s;
-
-typedef union User_union
-{
-    long long int id;
-    char name[8];
-}User_t;
+}User;
 
 
-void add_user(telebot_handler_t *handle, User_s *user);
-// Not active
-void delete_user();
-#ifdef DEBUG
+void add_user(telebot_handler_t *handle, User *user);
 void send_something(telebot_handler_t *handle, long long int id);
-#endif //DEBUG
+// static unsigned char *generate_random_token();
 
-#endif //USER_MGMT_H
+#endif

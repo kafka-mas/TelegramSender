@@ -18,7 +18,7 @@
 
 static void generate_random_token(char *token, size_t size);
 
-void add_user(telebot_handler_t *handle, User_s *user){
+void add_user(telebot_handler_t *handle, User *user){
     char rand_token[VERIFICATION_TOKEN_LENGTH];
     generate_random_token(rand_token, sizeof(rand_token));
     if(rand_token[0] == '\0'){
@@ -65,21 +65,11 @@ void add_user(telebot_handler_t *handle, User_s *user){
             {
                 if (strstr(message.text, "/start") || strstr(message.text, "/verify")){
                     expected_user_id = message.from->id;
+                    // printf("%s: %s \n", message.from->first_name, message.text);
                     ret = telebot_send_message(*handle, message.from->id, "Send your token.", "Markdown", false, false, 0, "");
                 } else if (message.from->id == expected_user_id && strcmp(rand_token, message.text) == 0) {
                     verified = true;
                     printf("%s\n", message.text);
-
-                    user->id = message.from->id;
-                    for(int i = 0; i < sizeof(message.from->first_name); i++){
-                        if (*(message.from->first_name + i) == '\0'){
-                            *(user->name + i) = '\0';
-                            break;
-                        }
-                        *(user->name + i) = *(message.from->first_name + i);
-                    }*(user->name + sizeof(message.from->first_name) - 1) = '\0';
-                    user->verified = true;
-
                     ret = telebot_send_message(*handle, message.from->id, "Your account succesfully added!!!", "Markdown", false, false, 0, "");
                     break;
                 } else if (expected_user_id != 0 && message.from->id == expected_user_id) {
@@ -92,7 +82,6 @@ void add_user(telebot_handler_t *handle, User_s *user){
     }
 }
 
-#ifdef DEBUG
 void send_something(telebot_handler_t *handle, long long int id){
     telebot_error_e ret;
     char *str = "`something`";
@@ -101,7 +90,6 @@ void send_something(telebot_handler_t *handle, long long int id){
         perror("Error while send message");
     }
 }
-#endif
 
 static void generate_random_token(char *token, size_t size){
     unsigned char random_bytes[VERIFICATION_TOKEN_LENGTH_BYTES];
