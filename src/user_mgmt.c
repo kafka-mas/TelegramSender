@@ -11,19 +11,16 @@
 #include <openssl/evp.h>
 #include <openssl/buffer.h>
 
-#define VERIFICATION_TOKEN_LENGTH_BYTES 24
-#define VERIFICATION_TOKEN_LENGTH VERIFICATION_TOKEN_LENGTH_BYTES * 4 / 3 + 1
-
-#define SIZE_OF_ARRAY(array) (sizeof(array) / sizeof(array[0]))
-
 static void generate_random_token(char *token, size_t size);
 
-void add_user(telebot_handler_t *handle, User_s *user){
+static int send_message(telebot_handler_t *handle, long long int id, char *message_s);
+
+bool add_user(telebot_handler_t *handle, User *user){
     char rand_token[VERIFICATION_TOKEN_LENGTH];
     generate_random_token(rand_token, sizeof(rand_token));
     if(rand_token[0] == '\0'){
         perror("Error generate verification token");
-        return;
+        return false;
     }
     printf("Verification token: %s\n", rand_token);
 
@@ -32,7 +29,8 @@ void add_user(telebot_handler_t *handle, User_s *user){
     int count;
     int offset = 0; 
     
-    ret = telebot_get_updates(*handle, offset, 100, 0, NULL, 0, &updates, &count);
+    const int limit = 100;
+    ret = telebot_get_updates(*handle, offset, limit, 0, NULL, 0, &updates, &count);
     if (ret == TELEBOT_ERROR_NONE && count > 0) {
         offset = updates[count-1].update_id + 1;
         telebot_put_updates(updates, count);
@@ -41,19 +39,23 @@ void add_user(telebot_handler_t *handle, User_s *user){
     telebot_message_t message;
     telebot_update_type_e update_types[] = {TELEBOT_UPDATE_TYPE_MESSAGE};
 
-    int64_t expected_user_id;
+/** @todo
+ * 10. Отсутствие обработки сигналов
+ * Проблема: При ожидании верификации программа может быть прервана сигналом, и пользователь не узнает о неудаче.
+ * Решение: Можно добавить обработку SIGINT, чтобы корректно завершить работу и вернуть ошибку.
+ */
+
     int index;
     bool verified = false;
     #ifdef DEBUG
-    while (!verified)
+        while (!verified)
     #else
-    const int MAX_WAIT = 20;
-    time_t start_time = time(NULL);
-    while (!verified && (time(NULL) - start_time < MAX_WAIT))
+        time_t start_time = time(NULL);
+        while (!verified)
     #endif
     {
         telebot_update_t *updates;
-        ret = telebot_get_updates(*handle, offset, 20, 30, update_types, 1, &updates, &count);
+        ret = telebot_get_updates(*handle, offset, MESSAGES_LIMIT, POLLING_TIMEOUT, update_types, UPDATES_COUNT, &updates, &count);
         if (ret != TELEBOT_ERROR_NONE){
             sleep(1);
             continue;
@@ -64,32 +66,33 @@ void add_user(telebot_handler_t *handle, User_s *user){
             if (message.text)
             {
                 if (strstr(message.text, "/start") || strstr(message.text, "/verify")){
-                    expected_user_id = message.from->id;
-                    ret = telebot_send_message(*handle, message.from->id, "Send your token.", "Markdown", false, false, 0, "");
-                } else if (message.from->id == expected_user_id && strcmp(rand_token, message.text) == 0) {
+                    send_message(handle, message.from->id, "Send your token.");
+
+                } else if (strcmp(rand_token, message.text) == 0) {
                     verified = true;
                     printf("%s\n", message.text);
 
                     user->id = message.from->id;
-                    for(int i = 0; i < sizeof(message.from->first_name); i++){
-                        if (*(message.from->first_name + i) == '\0'){
-                            *(user->name + i) = '\0';
-                            break;
-                        }
-                        *(user->name + i) = *(message.from->first_name + i);
-                    }*(user->name + sizeof(message.from->first_name) - 1) = '\0';
+                    snprintf(user->name, sizeof(user->name), "%s", message.from->first_name);
                     user->verified = true;
 
-                    ret = telebot_send_message(*handle, message.from->id, "Your account succesfully added!!!", "Markdown", false, false, 0, "");
+                    send_message(handle, message.from->id, "Your account succesfully added!!!");
                     break;
-                } else if (expected_user_id != 0 && message.from->id == expected_user_id) {
-                    ret = telebot_send_message(*handle, message.from->id, "Bad token; Try again.", "Markdown", false, false, 0, "");
+                } else {
+                    send_message(handle, message.from->id, "Bad token; Try again.");
                 }
             }
             offset = updates[index].update_id + 1;
         }
         telebot_put_updates(updates, count);
+        #ifndef DEBUG
+            if(time(NULL) - start_time < MAX_WAIT_TIME){
+                perror("Too long auth");
+                return false;
+            }
+        #endif
     }
+    return true;
 }
 
 #ifdef DEBUG
@@ -102,6 +105,19 @@ void send_something(telebot_handler_t *handle, long long int id){
     }
 }
 #endif
+
+int delete_user(UserSearch user){
+    printf("---------------------\n");
+    if (user.type == USER_SEARCH_BY_ID) {
+        printf("Id: %lli\n", user.value.id);
+    } else if (user.type == USER_SEARCH_BY_NAME) {
+        printf("Name: %s\n", *user.value.name);
+    } else return 1;
+    printf("---------------------\n");
+
+
+    return 0;
+}
 
 static void generate_random_token(char *token, size_t size){
     unsigned char random_bytes[VERIFICATION_TOKEN_LENGTH_BYTES];
@@ -127,6 +143,14 @@ static void generate_random_token(char *token, size_t size){
 
     b64 = BIO_new(BIO_f_base64());
     bio = BIO_new(BIO_s_mem());
+
+    if (!b64 || !bio) {
+        token[0] = '\0';
+        BIO_free_all(bio);
+        BIO_free_all(b64);
+        return;
+    }
+
     bio = BIO_push(b64, bio);
     BIO_set_flags(bio, BIO_FLAGS_BASE64_NO_NL);
     BIO_write(bio, random_bytes, sizeof(random_bytes));
@@ -141,4 +165,14 @@ static void generate_random_token(char *token, size_t size){
     }
 
     BIO_free_all(bio);
+}
+
+static int send_message(telebot_handler_t *handle, long long int id, char *message_s){
+    telebot_error_e ret;
+    ret = telebot_send_message(*handle, id, message_s, "Markdown", false, false, 0, "");
+    if(ret != TELEBOT_ERROR_NONE){
+        perror("Error while send message");
+        return 1;
+    }
+    return 0;
 }

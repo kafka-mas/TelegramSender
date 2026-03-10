@@ -6,13 +6,6 @@
 #include <ctype.h>
 
 char *read_token(){
-
-    #ifdef DEBUG
-        #define CONFIG_FILE_PATH PROJ_DIR "/debug/configs/sender.conf"
-    #else
-        #define CONFIG_FILE_PATH "/etc/telegram_sender/sender.conf"
-    #endif
-
     FILE * fp = fopen(CONFIG_FILE_PATH, "r");
 
     if(fp==NULL)
@@ -22,12 +15,9 @@ char *read_token(){
     }
     printf("Found config file at: %s\n", CONFIG_FILE_PATH);
 
-    char buffer[256];
-    int line_num = 0;
-    while((fgets(buffer, 256, fp))!=NULL)
+    char buffer[BUFFER_LENGTH];
+    while((fgets(buffer, BUFFER_LENGTH, fp))!=NULL)
     {
-        line_num++;
-
         buffer[strcspn(buffer, "\n")] = '\0';
 
         if (buffer[0] == '\0' || buffer[0] == '#') continue;
@@ -39,9 +29,8 @@ char *read_token(){
         char* name = buffer;
         char* value= eq_pos + 1;
 
-        if(strcmp("token", name) == 0){
-            char *result = malloc(strlen(value)+1);
-            if(result) strcpy(result, value);
+        if(strcmp("token", name) == 0 && value[0] != '\0'){
+            char *result = strdup(value);
             fclose(fp);
             return result;
         }

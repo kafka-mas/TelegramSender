@@ -9,7 +9,6 @@ int main(int argc, char* argv[]){
     char *token = read_token();
     if (token == NULL){
         perror("Token not found");
-        free(token);
         return -1;
     }
     telebot_handler_t handle;
@@ -20,11 +19,16 @@ int main(int argc, char* argv[]){
     }
     free(token);
 
-    User_s user;
-    add_user(&handle, &user);
+    User user;
+    if(!add_user(&handle, &user)){
+        return -1;
+    }
 
-    printf("|     ID     |   Name   | Ver |\n");
-    printf("| %-11lli| %-9s|  %i  |\n", user.id, user.name, user.verified);
+    printf("|     ID     |       Name       | Ver |\n");
+    printf("|%11lli | %16s |  %i  |\n", user.id, user.name, user.verified);
+
+    delete_user((UserSearch){.type=USER_SEARCH_BY_ID, .value.id=user.id});
+    delete_user((UserSearch){.type=USER_SEARCH_BY_NAME, .value.name=user.name});
 
     telebot_destroy(handle);
     return 0;
