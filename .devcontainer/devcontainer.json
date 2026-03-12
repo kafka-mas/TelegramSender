@@ -12,8 +12,13 @@
 		"vscode": {
 			"extensions": [
 				"ms-vscode.cpptools",
+				"ms-vscode.cpptools-extension-pack",
+				"cschlosser.doxdocgen",
 				"ms-vscode.cmake-tools",
-				"twxs.cmake"
+				"twxs.cmake",
+				"ms-vscode.makefile-tools",
+				"alexcvzz.vscode-sqlite",
+				"webfreak.debug"
 			]
 		}
 	},

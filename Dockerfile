@@ -2,7 +2,7 @@
 FROM gcc:trixie AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libcurl4-openssl-dev libjson-c-dev cmake binutils make \
+    libcurl4-openssl-dev libjson-c-dev cmake binutils make\
     && apt-get autoremove \
     && rm -rf /var/lib/apt/lists/*
 
@@ -22,12 +22,12 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
     && echo $TZ > /etc/timezone
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git curl locales
+    git curl locales iputils-ping
 RUN locale-gen en_US.UTF-8 ru_RU.UTF-8
 
 # Install all the toolchain dependencies for container
 RUN apt-get install -y --no-install-recommends \
-    gdb file git curl cmake\
+    gdb file git curl cmake libsqlite3-dev\
     && apt-get autoremove \
     && rm -rf /var/lib/apt/lists/*
 

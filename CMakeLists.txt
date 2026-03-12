@@ -5,6 +5,7 @@ set(SOURCES
     src/main.c
     src/config_read.c
     src/user_mgmt.c
+    src/database_connector.c
 )
 
 add_executable(main ${SOURCES})
@@ -23,7 +24,7 @@ ELSE(DEBUG)
 ENDIF(DEBUG)
 
 find_package(OpenSSL REQUIRED)
-target_link_libraries(main OpenSSL::Crypto telebot)
+target_link_libraries(main OpenSSL::Crypto sqlite3 telebot)
 
 set_target_properties(main PROPERTIES
     C_STANDARD 11
