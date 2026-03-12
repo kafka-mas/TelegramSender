@@ -16,12 +16,16 @@ static void generate_random_token(char *token, size_t size);
 static int send_message(telebot_handler_t *handle, long long int id, char *message_s);
 
 bool add_user(telebot_handler_t *handle, User *user){
-    char rand_token[VERIFICATION_TOKEN_LENGTH];
-    generate_random_token(rand_token, sizeof(rand_token));
-    if(rand_token[0] == '\0'){
-        perror("Error generate verification token");
-        return false;
-    }
+    #ifdef DEBUG
+        char rand_token[] = "123";
+    #else
+        char rand_token[VERIFICATION_TOKEN_LENGTH];
+        generate_random_token(rand_token, sizeof(rand_token));
+        if(rand_token[0] == '\0'){
+            perror("Error generate verification token");
+            return false;
+        }
+    #endif // DEBUG
     printf("Verification token: %s\n", rand_token);
 
     telebot_error_e ret;
