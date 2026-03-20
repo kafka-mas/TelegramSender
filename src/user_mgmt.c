@@ -13,7 +13,7 @@
 
 static void generate_random_token(char *token, size_t size);
 
-static int send_message(telebot_handler_t *handle, long long int id, char *message_s);
+static int send_message(telebot_handler_t *handle, long long int user_id, char *message_s);
 
 bool add_user(telebot_handler_t *handle, User *user){
     #ifdef DEBUG
@@ -76,7 +76,7 @@ bool add_user(telebot_handler_t *handle, User *user){
                     verified = true;
                     printf("%s\n", message.text);
 
-                    user->id = message.from->id;
+                    user->user_id = message.from->id;
                     snprintf(user->name, sizeof(user->name), "%s", message.from->first_name);
                     user->verified = true;
 
@@ -100,10 +100,10 @@ bool add_user(telebot_handler_t *handle, User *user){
 }
 
 #ifdef DEBUG
-void send_something(telebot_handler_t *handle, long long int id){
+void send_something(telebot_handler_t *handle, long long int user_id){
     telebot_error_e ret;
     char *str = "`something`";
-    ret = telebot_send_message(*handle, id, str, "Markdown", false, false, 0, "");
+    ret = telebot_send_message(*handle, user_id, str, "Markdown", false, false, 0, "");
     if(ret != TELEBOT_ERROR_NONE){
         perror("Error while send message");
     }
@@ -112,8 +112,8 @@ void send_something(telebot_handler_t *handle, long long int id){
 
 int delete_user(UserSearch user){
     printf("---------------------\n");
-    if (user.type == USER_SEARCH_BY_ID) {
-        printf("Id: %lli\n", user.value.id);
+    if (user.type == USER_SEARCH_BY_USER_ID) {
+        printf("Id: %lli\n", user.value.user_id);
     } else if (user.type == USER_SEARCH_BY_NAME) {
         printf("Name: %s\n", *user.value.name);
     } else return 1;
@@ -171,9 +171,9 @@ static void generate_random_token(char *token, size_t size){
     BIO_free_all(bio);
 }
 
-static int send_message(telebot_handler_t *handle, long long int id, char *message_s){
+static int send_message(telebot_handler_t *handle, long long int user_id, char *message_s){
     telebot_error_e ret;
-    ret = telebot_send_message(*handle, id, message_s, "Markdown", false, false, 0, "");
+    ret = telebot_send_message(*handle, user_id, message_s, "Markdown", false, false, 0, "");
     if(ret != TELEBOT_ERROR_NONE){
         perror("Error while send message");
         return 1;

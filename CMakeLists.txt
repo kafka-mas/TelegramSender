@@ -24,11 +24,7 @@ ELSE(DEBUG)
 ENDIF(DEBUG)
 
 find_package(OpenSSL REQUIRED)
-<<<<<<< HEAD
 target_link_libraries(main OpenSSL::Crypto sqlite3 telebot)
-=======
-target_link_libraries(main OpenSSL::Crypto telebot)
->>>>>>> 6e7ec1f (Create add_user)
 
 set_target_properties(main PROPERTIES
     C_STANDARD 11
