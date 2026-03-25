@@ -27,7 +27,14 @@ bool add_user(telebot_handler_t *handle, User *user);
  * @brief Not created yet
  * 
  */
-int delete_user(UserSearch user);
+// int delete_user(UserSearch user);
+
+/**
+ * @brief Sent text message to user (max 4096 bytes)
+ * 
+ * @return int 1 if error, 0 othewise
+ */
+int send_text(telebot_handler_t *handle, char *msg, long long int user_id);
 
 #ifdef DEBUG
 /**

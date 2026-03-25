@@ -1,9 +1,6 @@
 /**
  * @file database_connector.h
  * @author Kafka-mas (kafka_mas@disroot.org)
- * @brief 
- * @version 0.1.0
- * @date 2026-03-15
  * 
  * @copyright Copyright (c) 2026
  * 
@@ -73,5 +70,12 @@ int select_user(const UserSearch *parameter, User *user);
  * @return int 1 if error, else 0
  */
 int set_default_user();
+
+/**
+ * @brief Get the default user id object (if setted)
+ * 
+ * @return int 1 if error, otherwise 0
+ */
+int get_default_user_id(long long int *user_id);
 
 #endif // DATABASE_CONNECTOR_H

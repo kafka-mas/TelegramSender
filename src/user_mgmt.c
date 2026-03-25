@@ -13,6 +13,14 @@
 
 static void generate_random_token(char *token, size_t size);
 
+/**
+ * @brief Send message to user
+ * 
+ * @param handle telebot_handler_t type
+ * @param user_id telegram user id
+ * @param message_s message (less 4096 bytes)
+ * @return int 1 if error, 0 otherwise
+ */
 static int send_message(telebot_handler_t *handle, long long int user_id, char *message_s);
 
 bool add_user(telebot_handler_t *handle, User *user){
@@ -46,7 +54,7 @@ bool add_user(telebot_handler_t *handle, User *user){
 /** @todo
  * 10. Отсутствие обработки сигналов
  * Проблема: При ожидании верификации программа может быть прервана сигналом, и пользователь не узнает о неудаче.
- * Решение: Можно добавить обработку SIGINT, чтобы корректно завершить работу и вернуть ошибку.
+ * Решение: Добавить обработку SIGINT, чтобы корректно завершить работу и вернуть ошибку.
  */
 
     int index;
@@ -110,15 +118,25 @@ void send_something(telebot_handler_t *handle, long long int user_id){
 }
 #endif
 
-int delete_user(UserSearch user){
-    printf("---------------------\n");
-    if (user.type == USER_SEARCH_BY_USER_ID) {
-        printf("Id: %lli\n", user.value.user_id);
-    } else if (user.type == USER_SEARCH_BY_NAME) {
-        printf("Name: %s\n", *user.value.name);
-    } else return 1;
-    printf("---------------------\n");
+// int delete_user(UserSearch user){
+//     printf("---------------------\n");
+//     if (user.type == USER_SEARCH_BY_USER_ID) {
+//         printf("Id: %lli\n", user.value.user_id);
+//     } else if (user.type == USER_SEARCH_BY_NAME) {
+//         printf("Name: %s\n", *user.value.name);
+//     } else return 1;
+//     printf("---------------------\n");
 
+
+//     return 0;
+// }
+
+int send_text(telebot_handler_t *handle, char *msg, long long int user_id){
+    char buffer[4096];
+
+    snprintf(buffer, sizeof(buffer), "%s", msg);
+
+    if(send_message(handle, user_id, buffer) == 1) return 1;
 
     return 0;
 }

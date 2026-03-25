@@ -1,9 +1,11 @@
 #include <database_connector.h>
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <stddef.h>
 #include <string.h>
 #include <sqlite3.h>
+#include <limits.h>
 
 /**
  * @brief For `generate_table`. Set characters set for table.
@@ -25,6 +27,24 @@ typedef enum {
  */
 static void generate_line(char *str, const LINE_TYPE line_type, const int length, const int *positions, size_t pos_count);
 
+/**
+ * @brief Get the int object
+ * 
+ * @param prompt [in] Message to user
+ * @param value [out] Value from user
+ * @return int 1 if error, 0 otherwise
+ */
+static int get_int(const char *prompt, unsigned int *value);
+
+/**
+ * @brief Get the number of rows in a table 
+ * 
+ * @param table_name [in] Name of the table
+ * @param length [out] Number of rows
+ * @return int 1 if error, 0 otherwise
+ */
+static int get_table_row_numbers(const char *table_name, unsigned int *length);
+
 int create_table() {
     sqlite3 *db;    // указатель на базу данных
     char *err_msg = 0;  // сообщение об ошибке
@@ -38,7 +58,12 @@ int create_table() {
     }
 
     char *sql = "DROP TABLE IF EXISTS users;"
-                "CREATE TABLE users(id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER UNIQUE, f_name TEXT, is_default INTEGER);";
+                #ifndef DEBUG
+                    "CREATE TABLE users(id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER UNIQUE, f_name TEXT, is_default INTEGER NOT NULL DEFAULT 0);"
+                #else
+                    "CREATE TABLE users(id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, f_name TEXT, is_default INTEGER NOT NULL DEFAULT 0);"              
+                #endif //DEBUG
+                "CREATE UNIQUE INDEX idx_unique_default ON users(is_default) WHERE is_default = 1;";
  
     rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
     if (rc != SQLITE_OK )
@@ -76,11 +101,7 @@ int add_user_data(const long long int user_id, const char *name){
         sqlite3_bind_int(res, 3, 0);
         
         int step = sqlite3_step(res);
-        if (step == SQLITE_DONE) 
-        {
-            printf("data inserted\n");
-        }
-        else {
+        if (step != SQLITE_DONE){
             fprintf(stderr, "Error: %s\n", sqlite3_errmsg(db));
             sqlite3_finalize(res);
             sqlite3_close(db);
@@ -170,9 +191,9 @@ int delete_user_from_db(const UserSearch *parameter){
         return 1;
     }
 
-    const char *sql =   (parameter->type == USER_SEARCH_BY_ID) ? "DELETE FROM users WHERE id = ?;\0" :
+    const char *sql =   (parameter->type == USER_SEARCH_BY_ID)      ? "DELETE FROM users WHERE id = ?;\0" :
                         (parameter->type == USER_SEARCH_BY_USER_ID) ? "DELETE FROM users WHERE user_id = ?;\0" :
-                        (parameter->type == USER_SEARCH_BY_NAME) ? "DELETE FROM users WHERE f_name = ?;\0" : NULL;
+                        (parameter->type == USER_SEARCH_BY_NAME)    ? "DELETE FROM users WHERE f_name = ?;\0" : NULL;
      
     rc = sqlite3_prepare_v2(db, sql, -1, &res, 0);
 
@@ -225,9 +246,9 @@ int select_user(const UserSearch *parameter, User *user){
         return 1;
     }
 
-    const char *sql =   (parameter->type == USER_SEARCH_BY_ID) ? "SELECT * FROM users WHERE id = ?;" :
-                        (parameter->type == USER_SEARCH_BY_NAME) ? "SELECT * FROM users WHERE f_name = ?;" :
-                        (parameter->type == USER_SEARCH_BY_USER_ID) ? "SELECT * FROM users WHERE user_id = ?;" : NULL;
+    const char *sql = (parameter->type == USER_SEARCH_BY_ID)      ? "SELECT * FROM users WHERE id = ?;"         :
+                      (parameter->type == USER_SEARCH_BY_NAME)    ? "SELECT * FROM users WHERE f_name = ?;"     :
+                      (parameter->type == USER_SEARCH_BY_USER_ID) ? "SELECT * FROM users WHERE user_id = ?;"    : NULL;
 
     if (!sql) {
         sqlite3_close(db);
@@ -263,10 +284,107 @@ int select_user(const UserSearch *parameter, User *user){
     return 0;
 }
 
+int get_default_user_id(long long int *user_id){
+    sqlite3 *db;
+    sqlite3_stmt *res;
+
+    int rc  = sqlite3_open(DATABASE_PATH, &db);
+    if (rc != SQLITE_OK)
+    {
+        sqlite3_close(db);
+        return 1;
+    }
+
+    const char *sql = "SELECT * FROM users WHERE is_default = 1;";
+
+    if (!sql) {
+        sqlite3_close(db);
+        return 1;
+    }
+    
+    rc = sqlite3_prepare_v2(db, sql, -1, &res, 0);
+    if(rc == SQLITE_OK){
+        while (sqlite3_step(res) == SQLITE_ROW) 
+        {
+            *user_id = sqlite3_column_int64(res, 1);
+        }
+    } else {
+        fprintf(stderr, "Error: %s\n", sqlite3_errmsg(db));
+        sqlite3_finalize(res);
+        sqlite3_close(db);
+        return 1;
+    }
+
+    if(*user_id == 0){
+        fprintf(stderr, "Error getting default uset ID.\n");
+        return 1;
+    }
+
+    return 0;
+}
 
 int set_default_user(){
     print_all_users();
+    const char *prompt = "Enter the user number that should be the default: ";
+    unsigned int value;
+
+    if(get_int(prompt, &value) == 1){
+        fprintf(stderr, "Error getting value.\n");
+        return 1;
+    }
+    if(value == 0){
+        fprintf(stdout, "Exit. Default user not changed.\n");
+        return 0;
+    }
     
+    sqlite3 *db; 
+    sqlite3_stmt *res;
+    
+    int rc = sqlite3_open(DATABASE_PATH, &db);
+    if (rc != SQLITE_OK){
+        sqlite3_close(db);
+        return 1;
+    }
+     
+    rc = sqlite3_prepare_v2(db, "UPDATE users SET is_default = 0;", -1, &res, 0);
+    if (rc == SQLITE_OK) {
+        int step = sqlite3_step(res);
+        if (step != SQLITE_DONE){
+            fprintf(stderr, "Error: %s\n", sqlite3_errmsg(db));
+            sqlite3_finalize(res);
+            sqlite3_close(db);
+            return 1;
+        }
+    }
+    else
+    {
+        fprintf(stderr, "Error: %s\n", sqlite3_errmsg(db));
+        sqlite3_finalize(res);
+        sqlite3_close(db);
+        return 1;
+    }
+
+    rc = sqlite3_prepare_v2(db, "UPDATE users SET is_default = 1 WHERE id = ?;", -1, &res, 0);
+    if (rc == SQLITE_OK) {
+        sqlite3_bind_int(res, 1, value);
+        int step = sqlite3_step(res);
+        if (step != SQLITE_DONE){
+            fprintf(stderr, "Error: %s\n", sqlite3_errmsg(db));
+            sqlite3_finalize(res);
+            sqlite3_close(db);
+            return 1;
+        }
+    }
+    else
+    {
+        fprintf(stderr, "Error: %s\n", sqlite3_errmsg(db));
+        sqlite3_finalize(res);
+        sqlite3_close(db);
+        return 1;
+    }
+    sqlite3_finalize(res);
+    sqlite3_close(db);
+
     return 0;
 }
 
@@ -320,4 +438,83 @@ static void generate_line(char *str, const LINE_TYPE line_type, const int length
             }
         }
     }
+}
+
+static int get_int(const char *prompt, unsigned int *value){
+    char buffer[128];
+    char *endptr;
+    unsigned long val;
+
+    printf("%s", prompt);
+    if (fgets(buffer, sizeof(buffer), stdin) == NULL) {
+        return 1;
+    }
+
+    buffer[strcspn(buffer, "\n")] = '\0';
+
+    val = strtol(buffer, &endptr, 10);
+
+    if (endptr == buffer) {
+        printf("Error: must be int value.\n");
+        return 1;
+    }
+    if (val < 0) {
+        printf("Error: out of range.\n");
+        return 1;
+    }
+
+    while (*endptr != '\0') {
+        if (*endptr != ' ' && *endptr != '\n' && *endptr != '\t') {
+            printf("Error: must be int value.\n");
+            return 1;
+        }
+        endptr++;
+    }
+
+    *value = (int)val;
+    return 0;
+}
+
+static int get_table_row_numbers(const char *table_name, unsigned int *length){
+    sqlite3 *db;
+    sqlite3_stmt *res;
+    
+    int rc = sqlite3_open(DATABASE_PATH, &db);
+    if (rc != SQLITE_OK)
+    {
+        fprintf(stderr, "Cannot open database: %s\n", sqlite3_errmsg(db));
+        sqlite3_close(db);
+        return 1;
+    }
+    
+    char *sql = sqlite3_mprintf("SELECT COUNT(*) FROM %q;", table_name);
+    if (sql == NULL) {
+        fprintf(stderr, "Out of memory\n");
+        sqlite3_close(db);
+        return 1;
+    }
+
+    rc = sqlite3_prepare_v2(db, sql, -1, &res, 0);
+    sqlite3_free(sql);
+
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "SQL error: %s\n", sqlite3_errmsg(db));
+        sqlite3_close(db);
+        return 1;
+    }
+
+    rc = sqlite3_step(res);
+    if (rc != SQLITE_ROW) {
+        fprintf(stderr, "Step error: %s\n", sqlite3_errmsg(db));
+        sqlite3_finalize(res);
+        sqlite3_close(db);
+        return 1;
+    }
+
+    *length = (unsigned int)sqlite3_column_int(res, 0);
+
+    sqlite3_finalize(res);
+    sqlite3_close(db);
+
+    return 0;
 }
