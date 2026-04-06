@@ -51,12 +51,6 @@ bool add_user(telebot_handler_t *handle, User *user){
     telebot_message_t message;
     telebot_update_type_e update_types[] = {TELEBOT_UPDATE_TYPE_MESSAGE};
 
-/** @todo
- * 10. Отсутствие обработки сигналов
- * Проблема: При ожидании верификации программа может быть прервана сигналом, и пользователь не узнает о неудаче.
- * Решение: Добавить обработку SIGINT, чтобы корректно завершить работу и вернуть ошибку.
- */
-
     int index;
     bool verified = false;
     #ifdef DEBUG
@@ -107,6 +101,16 @@ bool add_user(telebot_handler_t *handle, User *user){
     return true;
 }
 
+int send_file(telebot_handler_t *handle, char *file_path, long long int user_id){
+    telebot_error_e ret;
+    ret = telebot_send_document(*handle, user_id, file_path, true, NULL, NULL, NULL, false, 0, NULL);
+    if(ret != TELEBOT_ERROR_NONE){
+        perror("Error while send file");
+        return 1;
+    }
+    return 0;
+}
+
 #ifdef DEBUG
 void send_something(telebot_handler_t *handle, long long int user_id){
     telebot_error_e ret;
@@ -117,19 +121,6 @@ void send_something(telebot_handler_t *handle, long long int user_id){
     }
 }
 #endif
-
-// int delete_user(UserSearch user){
-//     printf("---------------------\n");
-//     if (user.type == USER_SEARCH_BY_USER_ID) {
-//         printf("Id: %lli\n", user.value.user_id);
-//     } else if (user.type == USER_SEARCH_BY_NAME) {
-//         printf("Name: %s\n", *user.value.name);
-//     } else return 1;
-//     printf("---------------------\n");
-
-
-//     return 0;
-// }
 
 int send_text(telebot_handler_t *handle, char *msg, long long int user_id){
     char buffer[4096];

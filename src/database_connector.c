@@ -6,6 +6,7 @@
 #include <string.h>
 #include <sqlite3.h>
 #include <limits.h>
+#include <unistd.h>
 
 /**
  * @brief For `generate_table`. Set characters set for table.
@@ -45,12 +46,16 @@ static int get_int(const char *prompt, unsigned int *value);
  */
 static int get_table_row_numbers(const char *table_name, unsigned int *length);
 
+/**
+ * @brief Open term in interactive mod
+ * @return FILE* ptr to /dev/tty or NULL if doesn't exist.
+ */
+static FILE* open_terminal(void) ;
+
 int create_table() {
-    sqlite3 *db;    // указатель на базу данных
-    char *err_msg = 0;  // сообщение об ошибке
-    // создаем базу данных
+    sqlite3 *db;
+    char *err_msg = 0;
     int rc  = sqlite3_open(DATABASE_PATH, &db);
-    // если подключение прошло неудачно
     if (rc != SQLITE_OK)
     {
         sqlite3_close(db);
@@ -69,7 +74,7 @@ int create_table() {
     if (rc != SQLITE_OK )
     {
         printf("SQL error: %s\n", err_msg);
-        sqlite3_free(err_msg);      // очищаем ресурсы
+        sqlite3_free(err_msg);
         sqlite3_close(db);
         return 1;
     }
@@ -133,7 +138,7 @@ int print_all_users(){
         return 1;
     }
     
-    const char *sql = "SELECT * FROM users;";  // определяем запрос
+    const char *sql = "SELECT * FROM users;";
     
     rc = sqlite3_prepare_v2(db, sql, -1, &res, 0);
     
@@ -281,6 +286,57 @@ int select_user(const UserSearch *parameter, User *user){
     }
     sqlite3_finalize(res);
     sqlite3_close(db);
+    return 0;
+}
+
+int delete_user(){
+    print_all_users();
+    const char *prompt = "Enter the user number to delete: ";
+    unsigned int value;
+    UserSearch parameter;
+    User user;
+
+    if(get_int(prompt, &value) == 1){
+        fprintf(stderr, "Error getting value.\n");
+        return 1;
+    }
+    if(value == 0){
+        fprintf(stdout, "Exit. User not selected.\n");
+        return 0;
+    }
+
+    parameter.type = USER_SEARCH_BY_ID;
+    parameter.value.id = value;
+
+    if(delete_user_from_db(&parameter) == 1) return 1;
+
+    return 0;
+}
+
+int get_user_id(long long int *user_id){
+    print_all_users();
+    const char *prompt = "Enter the user number send to: ";
+    unsigned int value;
+    UserSearch parameter;
+    User user;
+
+    if(get_int(prompt, &value) == 1){
+        fprintf(stderr, "Error getting value.\n");
+        return 1;
+    }
+    if(value == 0){
+        fprintf(stdout, "Exit. User not selected.\n");
+        return 0;
+    }
+
+    parameter.type = USER_SEARCH_BY_ID;
+    parameter.value.id = value;
+    user.user_id = 0;
+
+    if(select_user(&parameter, &user) == 1) return 1;
+
+    *user_id = user.user_id;
+
     return 0;
 }
 
@@ -440,38 +496,61 @@ static void generate_line(char *str, const LINE_TYPE line_type, const int length
     }
 }
 
-static int get_int(const char *prompt, unsigned int *value){
+static int get_int(const char *prompt, unsigned int *value) {
+    FILE* in = NULL;
+    int need_close = 0;
+
+    if (isatty(STDIN_FILENO)) {
+        in = stdin;
+        need_close = 0;
+    } else {
+        in = fopen("/dev/tty", "r");
+        if (!in) {
+            fprintf(stderr, "Error: no terminal for interactive input.\n");
+            return 1;
+        }
+        need_close = 1;
+    }
+
+    // We print the prompt to stderr (guaranteed to be visible)
+    fprintf(stderr, "%s", prompt);
+    fflush(stderr);
+
     char buffer[128];
     char *endptr;
     unsigned long val;
 
-    printf("%s", prompt);
-    if (fgets(buffer, sizeof(buffer), stdin) == NULL) {
+    if (fgets(buffer, sizeof(buffer), in) == NULL) {
+        if (need_close) fclose(in);
         return 1;
     }
 
     buffer[strcspn(buffer, "\n")] = '\0';
 
-    val = strtol(buffer, &endptr, 10);
+    val = strtoul(buffer, &endptr, 10);
 
     if (endptr == buffer) {
-        printf("Error: must be int value.\n");
+        fprintf(stderr, "Error: must be int value.\n");
+        if (need_close) fclose(in);
         return 1;
     }
-    if (val < 0) {
-        printf("Error: out of range.\n");
+    if (val > UINT_MAX) {
+        fprintf(stderr, "Error: value out of range.\n");
+        if (need_close) fclose(in);
         return 1;
     }
 
     while (*endptr != '\0') {
         if (*endptr != ' ' && *endptr != '\n' && *endptr != '\t') {
-            printf("Error: must be int value.\n");
+            fprintf(stderr, "Error: must be int value.\n");
+            if (need_close) fclose(in);
             return 1;
         }
         endptr++;
     }
 
-    *value = (int)val;
+    *value = (unsigned int)val;
+    if (need_close) fclose(in);
     return 0;
 }
 
@@ -517,4 +596,17 @@ static int get_table_row_numbers(const char *table_name, unsigned int *length){
     sqlite3_close(db);
 
     return 0;
+}
+
+static FILE* open_terminal(void){
+    // Check if stdin is a terminal (then we can use it)
+    if (isatty(STDIN_FILENO)) {
+        return stdin;
+    }
+    // If stdin is not a terminal, try opening /dev/tty
+    FILE* term = fopen("/dev/tty", "r");
+    if (!term) {
+        fprintf(stderr, "Error: no terminal available for interactive input.\n");
+    }
+    return term;
 }

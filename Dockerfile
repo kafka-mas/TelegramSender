@@ -27,14 +27,12 @@ RUN locale-gen en_US.UTF-8 ru_RU.UTF-8
 
 # Install all the toolchain dependencies for container
 RUN apt-get install -y --no-install-recommends \
-    gdb file git curl cmake libsqlite3-dev\
+    gdb file git curl cmake libsqlite3-dev libjson-c-dev\
     && apt-get autoremove \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /usr/src/telebot/build/libtelebot.so.9.4 /usr/lib/
+COPY --from=builder /usr/src/telebot/build/libtelebot_static.a /usr/lib/
 COPY --from=builder /usr/src/telebot/include/* /usr/include/
-WORKDIR /usr/lib
-RUN ln -s libtelebot.so.9.4 libtelebot.so
 
 # Add user
 ENV USER_NAME=user

@@ -23,18 +23,27 @@
  */
 bool add_user(telebot_handler_t *handle, User *user);
 
-/**
- * @brief Not created yet
- * 
- */
-// int delete_user(UserSearch user);
+
 
 /**
- * @brief Sent text message to user (max 4096 bytes)
+ * @brief 
  * 
- * @return int 1 if error, 0 othewise
+ * @param handle [in] `telebot_handler_t` from telebot library.
+ * @param msg [in] message text to user (`char[4096]`)
+ * @param user_id [in] telegram user ID
+ * @return int 1 if error, else 0
  */
 int send_text(telebot_handler_t *handle, char *msg, long long int user_id);
+
+/**
+ * @brief Send file to user 
+ * 
+ * @param handle [in] `telebot_handler_t` from telebot library.
+ * @param file [in] file to user
+ * @param user_id [in] telegram user_id
+ * @return int 1 if error, else 0
+ */
+int send_file(telebot_handler_t *handle, char *file_path, long long int user_id);
 
 #ifdef DEBUG
 /**

@@ -36,8 +36,14 @@ configure_file(
     @ONLY
 )
 
+find_package(CURL REQUIRED)
+find_package(PkgConfig)
+pkg_check_modules(JSONC REQUIRED json-c)
+
 find_package(OpenSSL REQUIRED)
-target_link_libraries(main OpenSSL::Crypto sqlite3 telebot)
+target_link_libraries(main OpenSSL::Crypto sqlite3 telebot_static 
+    ${CURL_LIBRARIES}
+    ${JSONC_LIBRARIES})
 
 set_target_properties(main PROPERTIES
     OUTPUT_NAME ${OUT_NAME}

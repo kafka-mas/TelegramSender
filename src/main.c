@@ -1,3 +1,28 @@
+/**
+ * @file main.c
+ * @author Kafka (kafka_mas@disroot.org)
+ * @brief 
+ * @version 0.1.0
+ * @date 2026-03-25
+ * 
+ * @copyright Copyright Kafka (c) 2026
+ * 
+ * @todo Отсутствие обработки сигналов
+ * Проблема: При ожидании верификации программа может быть прервана сигналом, и пользователь не узнает о неудаче.
+ * Решение: Добавить обработку SIGINT, чтобы корректно завершить работу и вернуть ошибку.
+ * 
+ * @todo .deb и .rpm пакеты
+ * 
+ * @todo README.md
+ * 
+ * @todo скрипт установки
+ * 
+ * @todo proxy
+ * 
+ * @todo размещение файлов
+ * 
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <telebot.h>
@@ -5,6 +30,8 @@
 #include <getopt.h>
 #include <unistd.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <errno.h>
 
 #include "package_info.h"
 #include "type_definition.h"
@@ -18,16 +45,22 @@
  */
 int is_add_user = 0;
 int is_set_default = 0;
-// int is_send_file = 0;
+int is_send_file = 0;
 int is_send_to_default = 0;
-int is_specify_user = 0;
+int is_specify_username = 0;
+int is_specify_user_id = 0;
 int is_show_help = 0;
 int is_show_version = 0;
 int is_create_db = 0;
 int is_list_users = 0;
 int is_use_stdin = 0;
-// char *filename = NULL;
+int is_delete_user = 0;
+char *filepath = NULL;
 char *given_user_id = NULL;
+char *given_username = NULL;
+
+long long int user_id = 0;
+char msg[4096];
 
 /**
  * @brief Generate help message
@@ -50,36 +83,45 @@ int main(int argc, char* argv[]){
         {"add-user",    no_argument,        0,              'a'},
         {"set-default", no_argument,        &is_set_default,  1},
         {"create-db",   no_argument,        &is_create_db,    1},
-        // {"file",        required_argument,  0,              'f'},
+        {"file",        required_argument,  0,              'f'},
         {"list-users",  no_argument,        0,              'a'},
         {"user",        required_argument,  0,              'u'},
         {"default",     no_argument,        0,              'd'},
         {"version",     no_argument,        0,              'v'},
         {"help",        no_argument,        0,              'h'},
+        {"delete-user", no_argument,        &is_delete_user,  1},
         {0, 0, 0, 0}
     };
 
     int arg;
-    while ((arg = getopt_long(argc, argv, "u:adhvl", long_options, NULL)) != -1) {
+    while ((arg = getopt_long(argc, argv, "i:u:f:adhvl", long_options, NULL)) != -1) {
         switch (arg)
         {
-        case 'u':
-            is_specify_user = 1;
+        case 'i':
+            is_specify_user_id = 1;
             given_user_id = optarg;
             break;
-        // case 'f':
-        //     is_send_file = 1;
-        //     filename = optarg;
-        //     if (strcmp(filename, "-") == 0) {
-        //         use_stdin = 1;
-        //         filename = NULL;
-        //     }
-        //     break;
+        case 'u':
+            is_specify_username = 1;
+            given_username = optarg;
+            break;
+        case 'f':
+            filepath = optarg;
+            if (strcmp(filepath, "-") == 0) {
+                is_use_stdin = 1;
+                filepath = NULL;
+                break;
+            }
+            is_send_file = 1;
+            break;
         case 'a':
             is_add_user = 1;
             break;
         case 'd':
             is_send_to_default = 1;
+            if(get_default_user_id(&user_id) == 1){
+                return 1;
+            }
             break;
         case 'h':
             is_show_help = 1;
@@ -97,19 +139,13 @@ int main(int argc, char* argv[]){
 
     if(is_show_version) {show_ver(); return 0;}
     if(is_show_help) {show_help(); return 0;}
-// int is_add_user = 0;
-// int is_set_default = 0;
-// int is_send_file = 0;
-// int is_send_to_default = 0;
-// int is_specify_user = 0;
-// int is_show_help = 0;
-// int is_show_version = 0;
-    if(is_specify_user&&is_send_to_default){
+
+    if(is_specify_username + is_send_to_default + is_specify_user_id > 1){
         fprintf(stderr, "Error: incompatible launch options\n");
         return -1;
     }
 
-    if(is_add_user + is_set_default + is_create_db + is_list_users /*+ is_send_file*/ > 1){
+    if(is_add_user + is_set_default + is_create_db + is_list_users + is_send_file + is_delete_user > 1){
         fprintf(stderr, "Error: incompatible launch options\n");
         return -1;
     }
@@ -132,7 +168,55 @@ int main(int argc, char* argv[]){
         return 0;
     }
 
-    FILE *input = NULL;
+    if(is_delete_user){
+        if(delete_user() == 1) return 1;
+        return 0;
+    }
+
+    if(is_specify_user_id || is_specify_username){
+        UserSearch parameter;
+        User user;
+        user.user_id = 0;
+        
+
+        if(is_specify_username){
+            parameter.type = USER_SEARCH_BY_NAME;
+            strncpy(parameter.value.name, given_username, NAME_LENGTH - 1);
+            parameter.value.name[NAME_LENGTH - 1] = '\0';
+        }
+        if(is_specify_user_id){
+            char *endptr;
+            errno = 0;
+            long long id = strtoll(given_user_id, &endptr, 10);
+
+            if (errno != ERANGE && endptr != given_username && *endptr == '\0') {
+                parameter.type = USER_SEARCH_BY_USER_ID;
+                parameter.value.user_id = id;
+            } else {
+                fprintf(stderr, "Error get user id\n");
+                return 1;
+            }
+
+        }
+
+        select_user(&parameter, &user);
+        if(user.user_id == 0){
+            fprintf(stderr, "Error get user id\n");
+            return 1;
+        }
+        user_id = user.user_id;
+    }
+
+    if (!isatty(STDIN_FILENO)) {
+        is_use_stdin = 1;
+    }
+
+    if((!is_send_to_default && !is_specify_username && !is_specify_username) && (is_use_stdin || is_send_file)){
+        if(get_user_id(&user_id) == 1) {
+            fprintf(stderr, "Error getting user ID.\n");
+            return 1;
+        }
+    }
 
     /**
      * @brief Start bot
@@ -150,7 +234,6 @@ int main(int argc, char* argv[]){
         return -1;
     }
     free(token);
-
 
     if(is_add_user){
         User user;
@@ -170,16 +253,30 @@ int main(int argc, char* argv[]){
         return 0;
     }
 
-    if (!isatty(STDIN_FILENO)) {
-        is_use_stdin = 1;
+    if(is_send_file){
+        struct stat st;
+        if (stat(filepath, &st) != 0 && st.st_size / 1024.0 < 51200){
+            fprintf(stderr, "Error open file: file doesn't exist or size > 50 MB\n");
+
+            telebot_destroy(handle);
+            return 1;
+        }
+        printf("Sending file\n");
+        if (send_file(&handle, filepath, user_id) == 1){
+            telebot_destroy(handle);
+            return 1;
+        }
+        
+        telebot_destroy(handle);
+        return 0;
     }
 
     if(is_use_stdin){
+        FILE *input = NULL;
         input = stdin;
         int responce = 0;
 
         char buffer[256];
-        char msg[4096];
         size_t pos = 0;
         for(pos; pos < 3; pos++){
             msg[pos] = '`';
@@ -209,28 +306,15 @@ int main(int argc, char* argv[]){
             }msg[pos+5] = '\0';
         }
 
-        long long int user_id = 0;
-        if(is_send_to_default)
-        {
-            if(get_default_user_id(&user_id) == 1){
-                telebot_destroy(handle);
-                return 1;
-            }
+        if(send_text(&handle, msg, user_id) == 1){
+            telebot_destroy(handle);
+            return 1;
         }
 
-        send_text(&handle, msg, user_id);
-
-        return responce;
+        telebot_destroy(handle);
+        return 0;
     }
 
-
-
-    // printf("\nis_add_user: %i\n", is_add_user);
-    // printf("is_specify_user: %i. Arg: %s\n", is_specify_user, given_user_id);
-    // // printf("is_send_file: %i. Arg: %s\n", is_send_file, filename);
-    // printf("is_set_default: %i\n", is_set_default);
-    // printf("is_show_help: %i\n", is_show_help);
-    // printf("is_send_to_default: %i\n\n", is_send_to_default);
     show_help();
     telebot_destroy(handle);
     return 0;
@@ -240,12 +324,16 @@ int show_help(){
     const char *help = "Usage: " BIN_NAME " [OPTIONS] ...\n"
                        "  -a        --add-user      Add new user\n"                         //< Done
                        "            --create-db     Create database (drop if exist)\n"      //< Done
-                       "  -d        --default       Send to default user\n"                 //< Not created yet
-                    //    "  -f        --file          Specify input file\n"                   //< Not created yet
+                       "            --delete-user   Delete user from DB\n"                  //< Not created yet
+                       "  -d        --default       Send to default user\n"                 //< Done
+                       "  -f        --file          Specify input file\n"                   //< Done
                        "  -h        --help          Show help\n"                            //< Done
+                       "  -i        --user_id       Specify user_id to send message\n"      //< Done
+                       "                            (Only if user in DB)\n"
                        "  -l        --list-users    Show all users\n"                       //< Done
                        "            --set-default   Select default user in database\n"      //< Done
-                       "  -u        --user          Specify user to send\n"                 //< Done
+                       "  -u        --user          Specify username to send message\n"     //< Done
+                       "                            (Only if user in DB and unique)\n"
                        "  -v        --version       Show version info\n"                    //< Done
                        ;
 
