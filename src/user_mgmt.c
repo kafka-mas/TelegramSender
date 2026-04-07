@@ -92,7 +92,7 @@ bool add_user(telebot_handler_t *handle, User *user){
         }
         telebot_put_updates(updates, count);
         #ifndef DEBUG
-            if(time(NULL) - start_time < MAX_WAIT_TIME){
+            if(time(NULL) - start_time > MAX_WAIT_TIME){
                 perror("Too long auth");
                 return false;
             }

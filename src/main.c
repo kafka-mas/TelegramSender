@@ -11,15 +11,15 @@
  * Проблема: При ожидании верификации программа может быть прервана сигналом, и пользователь не узнает о неудаче.
  * Решение: Добавить обработку SIGINT, чтобы корректно завершить работу и вернуть ошибку.
  * 
- * @todo .deb и .rpm пакеты
+ * @todo отсчет времени во время верификации пользователя запускать отдельным потоком, чтобы прерывать добавление по истечении таймера
+ * 
+ * @todo .rpm пакеты
  * 
  * @todo README.md
  * 
  * @todo скрипт установки
  * 
  * @todo proxy
- * 
- * @todo размещение файлов
  * 
  */
 
@@ -322,19 +322,19 @@ int main(int argc, char* argv[]){
 
 int show_help(){
     const char *help = "Usage: " BIN_NAME " [OPTIONS] ...\n"
-                       "  -a        --add-user      Add new user\n"                         //< Done
-                       "            --create-db     Create database (drop if exist)\n"      //< Done
-                       "            --delete-user   Delete user from DB\n"                  //< Not created yet
-                       "  -d        --default       Send to default user\n"                 //< Done
-                       "  -f        --file          Specify input file\n"                   //< Done
-                       "  -h        --help          Show help\n"                            //< Done
-                       "  -i        --user_id       Specify user_id to send message\n"      //< Done
-                       "                            (Only if user in DB)\n"
-                       "  -l        --list-users    Show all users\n"                       //< Done
-                       "            --set-default   Select default user in database\n"      //< Done
-                       "  -u        --user          Specify username to send message\n"     //< Done
-                       "                            (Only if user in DB and unique)\n"
-                       "  -v        --version       Show version info\n"                    //< Done
+                       "  -a        --add-user      Add new user\n"                             //< Done
+                       "            --create-db     Create database (drop if exist)\n"          //< Done
+                       "            --delete-user   Delete user from DB\n"                      //< Done
+                       "  -d        --default       Send to default user\n"                     //< Done
+                       "  -f        --file          Specify input file\n"                       //< Done
+                       "  -h        --help          Show help\n"                                //< Done
+                       "  -i        --user_id       Specify telegram user_id to send message\n" //< Done
+                       "                            (Only if user exists in DB)\n"
+                       "  -l        --list-users    Show all users\n"                           //< Done
+                       "            --set-default   Specify default user in database\n"         //< Done
+                       "  -u        --user          Specify username to send message\n"         //< Done
+                       "                            (Only if user exists in DB and unique)\n"
+                       "  -v        --version       Show version info\n"                        //< Done
                        ;
 
     printf("%s\n", help);
