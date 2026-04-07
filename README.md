@@ -2,6 +2,8 @@
 
 `tgsend` is a console utility written in C that reads data from `stdin` or from a file and sends it to a specified Telegram chat via a bot.
 
+[Russian](./README.ru.md)
+
 ---
 
 ## Usage
