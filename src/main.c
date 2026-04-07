@@ -2,7 +2,7 @@
  * @file main.c
  * @author Kafka (kafka_mas@disroot.org)
  * @brief 
- * @version 0.1.0
+ * @version 0.2.0
  * @date 2026-03-25
  * 
  * @copyright Copyright Kafka (c) 2026
@@ -222,18 +222,37 @@ int main(int argc, char* argv[]){
      * @brief Start bot
      * 
      */
-    char *token = read_token();
-    if (token == NULL){
+    Config config = {
+        .token = '\0',
+        .proxy_address = '\0',
+        .proxy_port = '\0',
+        .proxy_user = '\0',
+        .proxy_port = '\0'
+    };
+
+    char proxy_url[INET6_ADDRSTRLEN+MAX_PORT_STRLEN];
+    char proxy_auth[BUFFER_LENGTH*2];
+
+    read_conf(&config);
+    if (*config.token == '\0'){
         perror("Token not found");
         return -1;
     }
     telebot_handler_t handle;
-    if (telebot_create(&handle, token) != TELEBOT_ERROR_NONE)
+    if (telebot_create(&handle, config.token) != TELEBOT_ERROR_NONE)
     {
         perror("Telebot create failed");
         return -1;
     }
-    free(token);
+
+    if(config.proxy_address[0] != '\0' && config.proxy_port[0] != '\0'){
+        snprintf(proxy_url, sizeof(proxy_url), "socks5://%s:%s", config.proxy_address, config.proxy_port);
+        if(config.proxy_user[0] != '\0' && config.proxy_password[0] != '\0'){
+            snprintf(proxy_auth, sizeof(proxy_auth), "%s:%s", config.proxy_user, config.proxy_password);
+        }
+        telebot_set_proxy(handle, proxy_url, proxy_auth);
+    }
+
 
     if(is_add_user){
         User user;
@@ -316,6 +335,7 @@ int main(int argc, char* argv[]){
     }
 
     show_help();
+
     telebot_destroy(handle);
     return 0;
 }
@@ -328,7 +348,7 @@ int show_help(){
                        "  -d        --default       Send to default user\n"                     //< Done
                        "  -f        --file          Specify input file\n"                       //< Done
                        "  -h        --help          Show help\n"                                //< Done
-                       "  -i        --user_id       Specify telegram user_id to send message\n" //< Done
+                       "  -i        --user-id       Specify telegram user_id to send message\n" //< Done
                        "                            (Only if user exists in DB)\n"
                        "  -l        --list-users    Show all users\n"                           //< Done
                        "            --set-default   Specify default user in database\n"         //< Done
