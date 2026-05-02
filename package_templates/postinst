@@ -1,3 +1,0 @@
-#!/bin/sh
-
-tgsend --create-db > /dev/null
