@@ -6,6 +6,7 @@ import (
 
 	"github.com/kafka-mas/TelegramSender/config"
 	"github.com/kafka-mas/TelegramSender/database"
+	"github.com/kafka-mas/TelegramSender/flagreader"
 )
 
 type Message interface {
@@ -32,6 +33,8 @@ type DBase interface {
 	GetRecord(DBid int) (*database.DBUser, error)
 	GetAllRecords() error
 	RemoveRecord(DBid int) error
+	SetDefault(DBid int) error
+	RemoveDefault() error
 }
 
 type Config interface {
@@ -39,11 +42,13 @@ type Config interface {
 }
 
 func main() {
-	f := flags{}
+	f := flagreader.Flags{}
 	err := f.Parse()
 	if err != nil {
 		log.Fatalln("Error:", err)
 	}
+	fmt.Println(f.IsAddUser)
+	fmt.Println(f.Help)
 
 	c := config.YamlConf{}
 	err = c.Read("config.yaml")
@@ -67,7 +72,7 @@ func main() {
 	}
 
 	dUser, err := db.GetRecord(id)
-	if err != nil {
+	if err != nil || dUser == nil {
 		log.Fatalln(err)
 	}
 	myUser := User_s{
@@ -79,6 +84,42 @@ func main() {
 	fmt.Println("db ID:", myUser.DBid)
 	fmt.Println("tg ID:", myUser.TGid)
 	fmt.Println("name:", myUser.TGname)
+
+	for range 3 {
+		id, err = db.AddRecord(123456789, "Alex")
+		if err != nil || id == -1 {
+			log.Println(err)
+		}
+	}
+
+	// usrs := []User{}
+	users, err := db.GetAllRecords()
+	if err != nil {
+		log.Println("Error get all records:", err)
+	}
+	fmt.Println()
+	for _, u := range *users {
+		fmt.Println(u.ID, u.UserID, u.Fname, u.ISdefault)
+	}
+
+	err = db.RemoveRecord(1)
+	if err != nil {
+		log.Println("Error remove record:", err)
+	}
+
+	err = db.SetDefault(2)
+	if err != nil{
+		log.Println(err)
+	}
+
+	users, err = db.GetAllRecords()
+	if err != nil {
+		log.Println("Error get all records:", err)
+	}
+	fmt.Println()
+	for _, u := range *users {
+		fmt.Println(u.ID, u.UserID, u.Fname, u.ISdefault)
+	}
 
 	if err := db.Delete(); err != nil {
 		log.Fatalln("Error", err)

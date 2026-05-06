@@ -70,16 +70,16 @@ func (d DBaseSQLite) AddRecord(user_id int64, f_name string) (DBid int, err erro
 	// char *sql = "INSERT INTO users (user_id, f_name, is_default) VALUES (?, ?, ?);";
 	result, err := db.Exec("insert into users (user_id, f_name, is_default) values ($1, $2, 0)", user_id, f_name)
 	if err != nil {
-		return 0, fmt.Errorf("error add record %v in database %v: %v", f_name, d.Name, err)
+		return -1, fmt.Errorf("error add record %v in database %v: %v", f_name, d.Name, err)
 	}
 
 	lastID, err := result.LastInsertId()
 	if err != nil {
-		return 0, fmt.Errorf("failed to get last insert id: %v", err)
+		return -1, fmt.Errorf("failed to get last insert id: %v", err)
 	}
 
 	if lastID > math.MaxInt {
-		return 0, fmt.Errorf("last insert id %d exceeds int max value (%d)", lastID, math.MaxInt)
+		return -1, fmt.Errorf("last insert id %d exceeds int max value (%d)", lastID, math.MaxInt)
 	}
 
 	DBid = int(lastID)
@@ -101,4 +101,78 @@ func (d DBaseSQLite) GetRecord(DBid int) (*DBUser, error) {
 	}
 
 	return &u, nil
+}
+
+func (d DBaseSQLite) GetAllRecords() (*[]DBUser, error) {
+	db, err := sql.Open("sqlite3", d.Name)
+	if err != nil {
+		return nil, fmt.Errorf("error open database: %v", err)
+	}
+	defer db.Close()
+
+	rows, err := db.Query("select * from users")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	users := []DBUser{}
+	for rows.Next() {
+		u := DBUser{}
+		rows.Scan(&u.ID, &u.UserID, &u.Fname, &u.ISdefault)
+		users = append(users, u)
+	}
+
+	return &users, nil
+}
+
+func (d DBaseSQLite) RemoveRecord(DBid int) error {
+	db, err := sql.Open("sqlite3", d.Name)
+	if err != nil {
+		return fmt.Errorf("error open database: %v", err)
+	}
+	defer db.Close()
+
+	_, err = db.Exec("delete from users where id = $1", DBid)
+	if err != nil {
+		return fmt.Errorf("error delete record: %v", err)
+	}
+	fmt.Printf("Record with ID %d succesfully removed.\n", DBid)
+	return nil
+}
+
+// SetDefault(DBid int) error
+
+func (d DBaseSQLite) SetDefault(DBid int) error {
+	db, err := sql.Open("sqlite3", d.Name)
+	if err != nil {
+		return fmt.Errorf("error open database: %v", err)
+	}
+	defer db.Close()
+
+	_, err = db.Exec("update users set is_default = 0")
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec("update users set is_default = 1 where id = $1", DBid)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (d DBaseSQLite) RemoveDefault() error {
+	db, err := sql.Open("sqlite3", d.Name)
+	if err != nil {
+		return fmt.Errorf("error open database: %v", err)
+	}
+	defer db.Close()
+
+	_, err = db.Exec("update users set is_default = 0")
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
