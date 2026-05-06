@@ -1,0 +1,6 @@
+token: 1234567890:ABCDEFGHJKLMNOPQRSTUVWXYZ1234567890
+socks:
+  address: 127.0.0.1
+  port: 10808
+  user: user
+  pass: pass
