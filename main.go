@@ -26,17 +26,6 @@ type User_s struct {
 	TGname string
 }
 
-type DBase interface {
-	Create() error
-	Delete() error
-	AddRecord(user_id int64, f_name string) (DBid int, err error)
-	GetRecord(DBid int) (*database.DBUser, error)
-	GetAllRecords() error
-	RemoveRecord(DBid int) error
-	SetDefault(DBid int) error
-	RemoveDefault() error
-}
-
 type Config interface {
 	Read(filepath string) error
 }
@@ -60,7 +49,8 @@ func main() {
 	fmt.Println(c.Socks)
 	fmt.Println()
 
-	db := database.DBaseSQLite{Name: "./db.sqlite"}
+
+	db := database.NewSQLite("./db.sqlite")
 	err = db.Create()
 	if err != nil {
 		log.Fatalln("Error", err)
@@ -92,7 +82,6 @@ func main() {
 		}
 	}
 
-	// usrs := []User{}
 	users, err := db.GetAllRecords()
 	if err != nil {
 		log.Println("Error get all records:", err)

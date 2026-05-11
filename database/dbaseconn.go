@@ -17,12 +17,23 @@ type DBUser struct {
 	ISdefault bool
 }
 
-type DBaseSQLite struct {
-	Name string
+type DB interface {
+	Create() error
+	Delete() error
+	AddRecord(user_id int64, f_name string) (DBid int, err error)
+	GetRecord(DBid int) (*DBUser, error)
+	GetAllRecords() (*[]DBUser, error)
+	RemoveRecord(DBid int) error
+	SetDefault(DBid int) error
+	RemoveDefault() error
 }
 
-func (d DBaseSQLite) Create() error {
-	db, err := sql.Open("sqlite3", d.Name)
+func NewSQLite(name string) DB { return sqliteDB{name: name} }
+
+type sqliteDB struct{ name string }
+
+func (d sqliteDB) Create() error {
+	db, err := sql.Open("sqlite3", d.name)
 	if err != nil {
 		return fmt.Errorf("error open database: %v", err)
 	}
@@ -31,7 +42,7 @@ func (d DBaseSQLite) Create() error {
 	createTable := `
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
+            user_id INTEGER UNIQUE,
             f_name TEXT,
             is_default INTEGER NOT NULL DEFAULT 0
         );`
@@ -51,26 +62,26 @@ func (d DBaseSQLite) Create() error {
 	return nil
 }
 
-func (d DBaseSQLite) Delete() error {
-	err := os.Remove(d.Name)
+func (d sqliteDB) Delete() error {
+	err := os.Remove(d.name)
 	if err != nil {
-		return fmt.Errorf("error delete database %v: %v", d.Name, err)
+		return fmt.Errorf("error delete database %v: %v", d.name, err)
 	}
 	log.Println("Database succesfully deleted.")
 	return nil
 }
 
-func (d DBaseSQLite) AddRecord(user_id int64, f_name string) (DBid int, err error) {
-	db, err := sql.Open("sqlite3", d.Name)
+func (d sqliteDB) AddRecord(user_id int64, f_name string) (DBid int, err error) {
+	db, err := sql.Open("sqlite3", d.name)
 	if err != nil {
-		return -1, fmt.Errorf("error delete database %v: %v", d.Name, err)
+		return -1, fmt.Errorf("error open database: %v", err)
 	}
 	defer db.Close()
 
 	// char *sql = "INSERT INTO users (user_id, f_name, is_default) VALUES (?, ?, ?);";
 	result, err := db.Exec("insert into users (user_id, f_name, is_default) values ($1, $2, 0)", user_id, f_name)
 	if err != nil {
-		return -1, fmt.Errorf("error add record %v in database %v: %v", f_name, d.Name, err)
+		return -1, fmt.Errorf("error add record %v in database %v: %v", f_name, d.name, err)
 	}
 
 	lastID, err := result.LastInsertId()
@@ -86,8 +97,8 @@ func (d DBaseSQLite) AddRecord(user_id int64, f_name string) (DBid int, err erro
 	return
 }
 
-func (d DBaseSQLite) GetRecord(DBid int) (*DBUser, error) {
-	db, err := sql.Open("sqlite3", d.Name)
+func (d sqliteDB) GetRecord(DBid int) (*DBUser, error) {
+	db, err := sql.Open("sqlite3", d.name)
 	if err != nil {
 		return nil, fmt.Errorf("error open database: %v", err)
 	}
@@ -103,8 +114,8 @@ func (d DBaseSQLite) GetRecord(DBid int) (*DBUser, error) {
 	return &u, nil
 }
 
-func (d DBaseSQLite) GetAllRecords() (*[]DBUser, error) {
-	db, err := sql.Open("sqlite3", d.Name)
+func (d sqliteDB) GetAllRecords() (*[]DBUser, error) {
+	db, err := sql.Open("sqlite3", d.name)
 	if err != nil {
 		return nil, fmt.Errorf("error open database: %v", err)
 	}
@@ -126,8 +137,8 @@ func (d DBaseSQLite) GetAllRecords() (*[]DBUser, error) {
 	return &users, nil
 }
 
-func (d DBaseSQLite) RemoveRecord(DBid int) error {
-	db, err := sql.Open("sqlite3", d.Name)
+func (d sqliteDB) RemoveRecord(DBid int) error {
+	db, err := sql.Open("sqlite3", d.name)
 	if err != nil {
 		return fmt.Errorf("error open database: %v", err)
 	}
@@ -143,8 +154,8 @@ func (d DBaseSQLite) RemoveRecord(DBid int) error {
 
 // SetDefault(DBid int) error
 
-func (d DBaseSQLite) SetDefault(DBid int) error {
-	db, err := sql.Open("sqlite3", d.Name)
+func (d sqliteDB) SetDefault(DBid int) error {
+	db, err := sql.Open("sqlite3", d.name)
 	if err != nil {
 		return fmt.Errorf("error open database: %v", err)
 	}
@@ -162,8 +173,8 @@ func (d DBaseSQLite) SetDefault(DBid int) error {
 	return nil
 }
 
-func (d DBaseSQLite) RemoveDefault() error {
-	db, err := sql.Open("sqlite3", d.Name)
+func (d sqliteDB) RemoveDefault() error {
+	db, err := sql.Open("sqlite3", d.name)
 	if err != nil {
 		return fmt.Errorf("error open database: %v", err)
 	}
