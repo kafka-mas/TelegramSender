@@ -26,10 +26,6 @@ type User_s struct {
 	TGname string
 }
 
-type Config interface {
-	Read(filepath string) error
-}
-
 func main() {
 	f := flagreader.Flags{}
 	err := f.Parse()
@@ -39,16 +35,28 @@ func main() {
 	fmt.Println(f.IsAddUser)
 	fmt.Println(f.Help)
 
-	c := config.YamlConf{}
-	err = c.Read("config.yaml")
+	c := config.Yaml("config.yaml")
+	conf, err := c.Read()
 	if err != nil {
 		log.Fatalln("Error", err)
 	}
 
-	fmt.Println(c.Token)
-	fmt.Println(c.Socks)
-	fmt.Println()
+	token := conf.Token
+	socks := struct {
+		addr string
+		port int
+		user string
+		pass string
+	}{
+		addr: conf.Socks.Address,
+		port: conf.Socks.Port,
+		user: conf.Socks.User,
+		pass: conf.Socks.Pass,
+	}
 
+	fmt.Println(token)
+	fmt.Println(socks)
+	fmt.Println()
 
 	db := database.NewSQLite("./db.sqlite")
 	err = db.Create()
@@ -75,8 +83,8 @@ func main() {
 	fmt.Println("tg ID:", myUser.TGid)
 	fmt.Println("name:", myUser.TGname)
 
-	for range 3 {
-		id, err = db.AddRecord(123456789, "Alex")
+	for i := range int64(3) {
+		id, err = db.AddRecord(123456780+i, "Alex")
 		if err != nil || id == -1 {
 			log.Println(err)
 		}
@@ -97,7 +105,7 @@ func main() {
 	}
 
 	err = db.SetDefault(2)
-	if err != nil{
+	if err != nil {
 		log.Println(err)
 	}
 

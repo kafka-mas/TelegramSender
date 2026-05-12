@@ -28,9 +28,9 @@ type DB interface {
 	RemoveDefault() error
 }
 
-func NewSQLite(name string) DB { return sqliteDB{name: name} }
-
 type sqliteDB struct{ name string }
+
+func NewSQLite(name string) DB { return sqliteDB{name: name} }
 
 func (d sqliteDB) Create() error {
 	db, err := sql.Open("sqlite3", d.name)
