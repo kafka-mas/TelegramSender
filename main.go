@@ -1,12 +1,13 @@
 package main
 
 import (
-	"fmt"
+	_ "fmt"
 	"log"
 
 	"github.com/kafka-mas/TelegramSender/config"
-	"github.com/kafka-mas/TelegramSender/database"
+	_ "github.com/kafka-mas/TelegramSender/database"
 	"github.com/kafka-mas/TelegramSender/flagreader"
+	"github.com/kafka-mas/TelegramSender/telegram"
 )
 
 type Message interface {
@@ -32,8 +33,6 @@ func main() {
 	if err != nil {
 		log.Fatalln("Error:", err)
 	}
-	fmt.Println(f.IsAddUser)
-	fmt.Println(f.Help)
 
 	c := config.Yaml("config.yaml")
 	conf, err := c.Read()
@@ -50,75 +49,92 @@ func main() {
 	}{
 		addr: conf.Socks.Address,
 		port: conf.Socks.Port,
-		user: conf.Socks.User,
-		pass: conf.Socks.Pass,
 	}
 
-	fmt.Println(token)
-	fmt.Println(socks)
-	fmt.Println()
+	bot := telegram.NewBot(token, telegram.WithSocksProxy(socks.addr, socks.port))
 
-	db := database.NewSQLite("./db.sqlite")
-	err = db.Create()
-	if err != nil {
-		log.Fatalln("Error", err)
-	}
-
-	id, err := db.AddRecord(123456789, "Alex")
+	err = bot.SendFile(f.UserId, "./telegram/telegram.go")
 	if err != nil {
 		log.Println(err)
 	}
+	// var msg_r []rune
+	//
+	// for range 10{
+	// 	msg_r = append(msg_r, rune('你'))
+	// }
+	//
+	// msg := string(msg_r)
+	//
+	// err = bot.SendMessage(198295567, msg, true)
+	// if err != nil {
+	// 	log.Println(err)
+	// }
 
-	dUser, err := db.GetRecord(id)
-	if err != nil || dUser == nil {
-		log.Fatalln(err)
-	}
-	myUser := User_s{
-		DBid:   dUser.ID,
-		TGid:   dUser.UserID,
-		TGname: dUser.Fname,
-	}
-
-	fmt.Println("db ID:", myUser.DBid)
-	fmt.Println("tg ID:", myUser.TGid)
-	fmt.Println("name:", myUser.TGname)
-
-	for i := range int64(3) {
-		id, err = db.AddRecord(123456780+i, "Alex")
-		if err != nil || id == -1 {
-			log.Println(err)
-		}
-	}
-
-	users, err := db.GetAllRecords()
-	if err != nil {
-		log.Println("Error get all records:", err)
-	}
-	fmt.Println()
-	for _, u := range *users {
-		fmt.Println(u.ID, u.UserID, u.Fname, u.ISdefault)
-	}
-
-	err = db.RemoveRecord(1)
-	if err != nil {
-		log.Println("Error remove record:", err)
-	}
-
-	err = db.SetDefault(2)
-	if err != nil {
-		log.Println(err)
-	}
-
-	users, err = db.GetAllRecords()
-	if err != nil {
-		log.Println("Error get all records:", err)
-	}
-	fmt.Println()
-	for _, u := range *users {
-		fmt.Println(u.ID, u.UserID, u.Fname, u.ISdefault)
-	}
-
-	if err := db.Delete(); err != nil {
-		log.Fatalln("Error", err)
-	}
+	// fmt.Println(token)
+	// fmt.Println(socks)
+	// fmt.Println()
+	//
+	// db := database.NewSQLite("./db.sqlite")
+	// err = db.Create()
+	// if err != nil {
+	// 	log.Fatalln("Error", err)
+	// }
+	//
+	// id, err := db.AddRecord(123456789, "Alex")
+	// if err != nil {
+	// 	log.Println(err)
+	// }
+	//
+	// dUser, err := db.GetRecord(id)
+	// if err != nil || dUser == nil {
+	// 	log.Fatalln(err)
+	// }
+	// myUser := User_s{
+	// 	DBid:   dUser.ID,
+	// 	TGid:   dUser.UserID,
+	// 	TGname: dUser.Fname,
+	// }
+	//
+	// fmt.Println("db ID:", myUser.DBid)
+	// fmt.Println("tg ID:", myUser.TGid)
+	// fmt.Println("name:", myUser.TGname)
+	//
+	// for i := range int64(3) {
+	// 	id, err = db.AddRecord(123456780+i, "Alex")
+	// 	if err != nil || id == -1 {
+	// 		log.Println(err)
+	// 	}
+	// }
+	//
+	// users, err := db.GetAllRecords()
+	// if err != nil {
+	// 	log.Println("Error get all records:", err)
+	// }
+	// fmt.Println()
+	// for _, u := range *users {
+	// 	fmt.Println(u.ID, u.UserID, u.Fname, u.ISdefault)
+	// }
+	//
+	// err = db.RemoveRecord(1)
+	// if err != nil {
+	// 	log.Println("Error remove record:", err)
+	// }
+	//
+	// err = db.SetDefault(2)
+	// if err != nil {
+	// 	log.Println(err)
+	// }
+	//
+	// users, err = db.GetAllRecords()
+	// if err != nil {
+	// 	log.Println("Error get all records:", err)
+	// }
+	// fmt.Println()
+	// for _, u := range *users {
+	// 	fmt.Println(u.ID, u.UserID, u.Fname, u.ISdefault)
+	// }
+	//
+	// if err := db.Delete(); err != nil {
+	// 	log.Fatalln("Error", err)
+	// }
 }

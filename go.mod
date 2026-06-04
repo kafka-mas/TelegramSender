@@ -7,6 +7,7 @@ require gopkg.in/yaml.v3 v3.0.1
 require (
 	github.com/mattn/go-sqlite3 v1.14.44
 	github.com/stretchr/testify v1.11.1
+	golang.org/x/net v0.54.0
 )
 
 require (
