@@ -168,7 +168,7 @@ func TestGetRecord(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, tt.userID, result.UserID, "Must be equal")
-				assert.Equal(t, tt.fname, result.Fname, "Must be equal")
+				assert.Equal(t, tt.fname, result.UserName, "Must be equal")
 			}
 
 		})
@@ -203,19 +203,19 @@ func TestGetAllRecords(t *testing.T) {
 				{
 					ID:        1,
 					UserID:    12345678901,
-					Fname:     "UserA",
+					UserName:     "UserA",
 					ISdefault: false,
 				},
 				{
 					ID:        2,
 					UserID:    12345678902,
-					Fname:     "UserB",
+					UserName:     "UserB",
 					ISdefault: false,
 				},
 				{
 					ID:        3,
 					UserID:    12345678903,
-					Fname:     "UserC",
+					UserName:     "UserC",
 					ISdefault: false,
 				},
 			},

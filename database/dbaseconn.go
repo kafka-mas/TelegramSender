@@ -13,14 +13,14 @@ import (
 type DBUser struct {
 	ID        int
 	UserID    int64
-	Fname     string
+	UserName     string
 	ISdefault bool
 }
 
 type DB interface {
 	Create() error
 	Delete() error
-	AddRecord(user_id int64, f_name string) (DBid int, err error)
+	AddRecord(user_id int64, user_name string) (DBid int, err error)
 	GetRecord(DBid int) (*DBUser, error)
 	GetAllRecords() (*[]DBUser, error)
 	RemoveRecord(DBid int) error
@@ -43,7 +43,7 @@ func (d sqliteDB) Create() error {
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER UNIQUE,
-            f_name TEXT,
+            user_name TEXT,
             is_default INTEGER NOT NULL DEFAULT 0
         );`
 	if _, err = db.Exec(createTable); err != nil {
@@ -71,17 +71,17 @@ func (d sqliteDB) Delete() error {
 	return nil
 }
 
-func (d sqliteDB) AddRecord(user_id int64, f_name string) (DBid int, err error) {
+func (d sqliteDB) AddRecord(user_id int64, user_name string) (DBid int, err error) {
 	db, err := sql.Open("sqlite3", d.name)
 	if err != nil {
 		return -1, fmt.Errorf("error open database: %v", err)
 	}
 	defer db.Close()
 
-	// char *sql = "INSERT INTO users (user_id, f_name, is_default) VALUES (?, ?, ?);";
-	result, err := db.Exec("insert into users (user_id, f_name, is_default) values ($1, $2, 0)", user_id, f_name)
+	// char *sql = "INSERT INTO users (user_id, user_name, is_default) VALUES (?, ?, ?);";
+	result, err := db.Exec("insert into users (user_id, user_name, is_default) values ($1, $2, 0)", user_id, user_name)
 	if err != nil {
-		return -1, fmt.Errorf("error add record %v in database %v: %v", f_name, d.name, err)
+		return -1, fmt.Errorf("error add record %v in database %v: %v", user_name, d.name, err)
 	}
 
 	lastID, err := result.LastInsertId()
@@ -104,9 +104,9 @@ func (d sqliteDB) GetRecord(DBid int) (*DBUser, error) {
 	}
 	defer db.Close()
 
-	row := db.QueryRow("select id, user_id, f_name from users where id = $1", DBid)
+	row := db.QueryRow("select id, user_id, user_name from users where id = $1", DBid)
 	u := DBUser{}
-	err = row.Scan(&u.ID, &u.UserID, &u.Fname)
+	err = row.Scan(&u.ID, &u.UserID, &u.UserName)
 	if err != nil {
 		return nil, fmt.Errorf("error get value by id %d: %v", DBid, err)
 	}
@@ -130,7 +130,7 @@ func (d sqliteDB) GetAllRecords() (*[]DBUser, error) {
 	users := []DBUser{}
 	for rows.Next() {
 		u := DBUser{}
-		rows.Scan(&u.ID, &u.UserID, &u.Fname, &u.ISdefault)
+		rows.Scan(&u.ID, &u.UserID, &u.UserName, &u.ISdefault)
 		users = append(users, u)
 	}
 

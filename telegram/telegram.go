@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -53,6 +54,8 @@ type telebot struct {
 type BOT interface {
 	SendMessage(chatID int64, message string, isCode bool) error
 	SendFile(chatID int64, filepath string) error
+	ReceiveMessage(timeout int) (*User, error)
+	ReceiveFile(timeout int) error
 }
 
 func (t telebot) SendMessage(chatID int64, message string, isCode bool) error {
@@ -158,23 +161,147 @@ func (t telebot) SendFile(chatID int64, filepath string) error {
 	return nil
 }
 
-func prepareMsg(message string, codeWrap bool) []string {
-	var msgFrag []string
-	message_r := []rune(message)
-	if codeWrap {
-		// 4088
-		contLen := maxLength - 8
-		for i := 0; i < len(message_r); i += contLen {
-			end := min(i+contLen, len(message_r))
-			content := message_r[i:end]
-			msg := "```\n" + string(content) + "\n```"
-			msgFrag = append(msgFrag, msg)
-		}
-	} else {
-		for i := 0; i < len(message_r); i += maxLength {
-			end := min(i+maxLength, len(message_r))
-			msgFrag = append(msgFrag, string(message_r[i:end]))
+type User struct {
+	UserID   int64
+	Username string
+	Message  string
+}
+
+func getMessage(token string, timeout int) (*Response, error) {
+	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/getUpdates?limit=1&offset=-1", token)
+
+	resp, err := http.Get(apiURL)
+	if err != nil {
+		return nil, fmt.Errorf("error get messages: %w", err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+
+	var response Response
+
+	if err = json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("error parse JSON: %w", err)
+	}
+
+	var offset int64
+	if len(response.Result) > 0 {
+		offset = response.Result[0].UpdateID
+	}
+	offset += 1
+	apiURL = fmt.Sprintf("https://api.telegram.org/bot%s/getUpdates?timeout=%d&limit=1&offset=%d", token, timeout, offset)
+
+	resp, err = http.Get(apiURL)
+	if err != nil {
+		return nil, fmt.Errorf("error get messages: %w", err)
+	}
+	body, _ = io.ReadAll(resp.Body)
+	resp.Body.Close()
+
+	if err = json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("error parse JSON: %w", err)
+	}
+
+	if len(response.Result) == 0 {
+		return nil, fmt.Errorf("no message detected")
+	}
+
+	return &response, nil
+}
+
+// curl "https://api.telegram.org/bot$TOKEN/getUpdates?timeout=10&limit=1&offset=-1"
+// curl "https://api.telegram.org/bot$TOKEN/getUpdates?timeout=10&limit=1&offset=$MESSAGE_ID"
+func (t telebot) ReceiveMessage(timeout int) (*User, error) {
+	response, err := getMessage(t.token, timeout)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println(response)
+
+	var user *User = &User{}
+	if response.Result[0].Message.Text != "" {
+		msg := response.Result[0].Message
+		user.UserID = msg.Chat.ID
+		user.Username = msg.Chat.Username
+		user.Message = msg.Text
+		return user, nil
+	}
+
+	return nil, nil
+}
+
+// curl "https://api.telegram.org/bot$TOKEN/getFile?file_id=BQACAgIAAxkBAAID82o0OlIc0681CUoBgrpVtlse_HfvAAJ61wACiaOgSVs1vUNBYa0SPAQ"
+// curl "https://api.telegram.org/file/bot$TOKEN/documents/file_6.mod" -o go.mod
+func (t telebot) ReceiveFile(timeout int) error {
+	response, err := getMessage(t.token, timeout)
+	if err != nil {
+		return err
+	}
+	if response.Result[0].Message.Document.FileID != "" {
+		file := response.Result[0].Message.Document
+		if file.FileSize > 50*1024*1024 {
+			var wInMb float64 = float64(file.FileSize) / 1024.0 / 1024.0
+			return fmt.Errorf("error: file size must be under 50 Mb, given: %f", wInMb)
 		}
 	}
-	return msgFrag
+
+	// FileID
+	fileIdURL := fmt.Sprintf("https://api.telegram.org/bot%s/getFile?file_id=%s", t.token, response.Result[0].Message.Document.FileID)
+	fmt.Println(fileIdURL)
+
+	resp, err := http.Get(fileIdURL)
+	if err != nil {
+		return fmt.Errorf("error get messages: %w", err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+
+	type res struct {
+		FileID       string `json:"file_id"`
+		FileUniqueID string `json:"file_unique_id"`
+		FileSize     int64  `json:"file_size"`
+		FilePath     string `json:"file_path"`
+	}
+
+	var fileResponse struct {
+		Ok     bool `json:"ok"`
+		Result res  `json:"result"`
+	}
+
+	if err = json.Unmarshal(body, &fileResponse); err != nil {
+		return fmt.Errorf("error parse JSON: %w", err)
+	}
+
+	if !fileResponse.Ok {
+		return fmt.Errorf("error getting message")
+	}
+
+	if fileResponse.Result == (res{}) {
+		return fmt.Errorf("no message detected")
+	}
+
+	filePathAPI := fmt.Sprintf("https://api.telegram.org/file/bot%s/%s", t.token, fileResponse.Result.FilePath)
+
+	resp, err = http.Get(filePathAPI)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("bad status: %s", resp.Status)
+	}
+
+	out, err := os.Create(response.Result[0].Message.Document.FileName)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
